@@ -3,7 +3,7 @@
 Citizens report civic issues like potholes, garbage, and broken streetlights with photo and location data.
 
 ## 🚀 Live Demo
-*[Link to live demo coming soon]*
+[CivicReport Live App](https://civic-issue-reporter-snowy-nine.vercel.app)
 
 ## 📸 Screenshots
 *[Screenshots of dashboard and reporting flow coming soon]*
@@ -13,7 +13,7 @@ Citizens report civic issues like potholes, garbage, and broken streetlights wit
 - **Protected Dashboard**: Personalized dashboard showing issue statistics.
 - **Issue Reporting Form**: Submit issues with a title, category, and description.
 - **Photo Uploads**: Seamlessly attach photos to reports (stored securely).
-- **Geolocation**: Auto-capture the exact location of the issue via browser APIs.
+- **Geolocation**: Auto-capture the current location of the issue via browser APIs.
 - **Data Security**: Fully protected database tables and storage buckets using Supabase Row Level Security (RLS).
 
 ## 🛠️ Tech Stack
