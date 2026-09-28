@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CivicReport 🏙️
 
-## Getting Started
+Citizens report civic issues like potholes, garbage, and broken streetlights with photo and location data.
 
-First, run the development server:
+## 🚀 Live Demo
+*[Link to live demo coming soon]*
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 📸 Screenshots
+*[Screenshots of dashboard and reporting flow coming soon]*
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ✨ Features (Built So Far)
+- **Secure Authentication**: Email/password signup and login with email confirmation (Google sign-in UI is in place; OAuth provider setup is on the roadmap).
+- **Protected Dashboard**: Personalized dashboard showing issue statistics.
+- **Issue Reporting Form**: Submit issues with a title, category, and description.
+- **Photo Uploads**: Seamlessly attach photos to reports (stored securely).
+- **Geolocation**: Auto-capture the exact location of the issue via browser APIs.
+- **Data Security**: Fully protected database tables and storage buckets using Supabase Row Level Security (RLS).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Tech Stack
+- **Frontend**: Next.js (App Router), React, Tailwind CSS
+- **Backend & Database**: Supabase (PostgreSQL, Auth, Storage)
+- **Hosting**: Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🗺️ Roadmap
+- [ ] List view of "My Reports" on the dashboard
+- [ ] Public map view to see all reported issues in the community
+- [ ] Upvoting system for community issues
+- [ ] Admin dashboard for city officials to update issue statuses
+- [ ] AI photo classification and validation
+- [ ] Enable Google OAuth provider
 
-## Learn More
+## 💻 Local Setup
 
-To learn more about Next.js, take a look at the following resources:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/sohamwadekar04/civic-issue-reporter.git
+   cd civic-issue-reporter
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Configure Environment Variables**
+   Create a `.env.local` file in the root directory based on the `.env.example` file:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Then, populate the variables with your Supabase project credentials.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
