@@ -3,13 +3,25 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+
+interface Issue {
+  id: string
+  title: string
+  category: string
+  status: string
+  photo_url: string | null
+  upvotes: number
+  created_at: string
+}
 
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [issues, setIssues] = useState<Issue[]>([])
   const [stats, setStats] = useState({
     reported: 0,
     inProgress: 0,
@@ -19,17 +31,19 @@ export default function DashboardPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    async function fetchStats(userId: string) {
-      const { data: issues } = await supabase
+    async function fetchDashboardData(userId: string) {
+      const { data: userIssues } = await supabase
         .from('issues')
-        .select('status')
+        .select('*')
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
 
-      if (issues) {
+      if (userIssues) {
+        setIssues(userIssues)
         setStats({
-          reported: issues.length,
-          inProgress: issues.filter((i) => i.status === 'in_progress').length,
-          resolved: issues.filter((i) => i.status === 'resolved').length,
+          reported: userIssues.length,
+          inProgress: userIssues.filter((i) => i.status === 'in_progress').length,
+          resolved: userIssues.filter((i) => i.status === 'resolved').length,
         })
       }
     }
@@ -40,7 +54,7 @@ export default function DashboardPage() {
         return
       }
       setUser(session.user)
-      fetchStats(session.user.id)
+      fetchDashboardData(session.user.id)
       setLoading(false)
     })
 
@@ -52,7 +66,7 @@ export default function DashboardPage() {
         return
       }
       setUser(session.user)
-      fetchStats(session.user.id)
+      fetchDashboardData(session.user.id)
     })
 
     return () => subscription.unsubscribe()
@@ -63,6 +77,21 @@ export default function DashboardPage() {
     await supabase.auth.signOut()
     router.replace('/login')
     router.refresh()
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'resolved':
+        return 'bg-green-100 text-green-800'
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
   }
 
   if (loading) {
@@ -166,7 +195,7 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-8">
+        <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-8 mb-6">
           <div className="flex items-center gap-4 mb-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-lg font-bold select-none">
               {user?.email?.[0].toUpperCase() ?? '?'}
@@ -185,7 +214,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-10">
           {[
             { label: 'Issues Reported', value: stats.reported, icon: '📋' },
             { label: 'In Progress', value: stats.inProgress, icon: '🔧' },
@@ -200,6 +229,84 @@ export default function DashboardPage() {
               <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* My Reports Section */}
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">My Reports</h2>
+          
+          {issues.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 mb-4">
+                <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-medium text-gray-900">No issues reported</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-6">
+                You haven&apos;t reported any civic issues yet. Be the change in your community!
+              </p>
+              <Link
+                href="/report"
+                className="inline-flex items-center justify-center rounded-lg border border-transparent bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
+              >
+                Report your first issue
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {issues.map((issue) => (
+                <div key={issue.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col transition hover:shadow-md">
+                  {issue.photo_url ? (
+                    <div className="aspect-video w-full bg-gray-100 relative">
+                      <Image
+                        src={issue.photo_url}
+                        alt={issue.title}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-video w-full bg-gray-100 flex items-center justify-center text-gray-400">
+                      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  <div className="p-5 flex-1 flex flex-col">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 line-clamp-2" title={issue.title}>
+                        {issue.title}
+                      </h3>
+                      <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(issue.status)}`}>
+                        {formatStatus(issue.status)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 capitalize">
+                        {issue.category}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(issue.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    
+                    <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.514" />
+                        </svg>
+                        <span className="font-medium text-gray-700">{issue.upvotes}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </main>
