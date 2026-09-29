@@ -21,6 +21,12 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <Link
+              href="/map"
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition px-2"
+            >
+              Public Map
+            </Link>
+            <Link
               href="/login"
               className="text-sm font-medium text-gray-600 hover:text-gray-900 transition px-2"
             >
