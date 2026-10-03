@@ -201,6 +201,12 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-4">
             <Link
+              href="/admin"
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
+            >
+              Admin
+            </Link>
+            <Link
               href="/map"
               className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
             >
