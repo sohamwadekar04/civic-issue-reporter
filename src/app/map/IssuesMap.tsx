@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 
 // Fix missing marker icons in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -31,25 +33,98 @@ const CATEGORIES = ['All', 'pothole', 'garbage', 'streetlight', 'water', 'other'
 const STATUSES = ['All', 'reported', 'in_progress', 'resolved']
 
 export default function IssuesMap() {
+  const router = useRouter()
   const [issues, setIssues] = useState<Issue[]>([])
+  const [user, setUser] = useState<User | null>(null)
+  const [upvotedIssueIds, setUpvotedIssueIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [isUpvoting, setIsUpvoting] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    async function fetchIssues() {
+    async function fetchData() {
       const supabase = createClient()
-      const { data, error } = await supabase
+      
+      // Get session
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUser = session?.user || null
+      setUser(currentUser)
+
+      // Fetch issues
+      const { data: issuesData } = await supabase
         .from('issues')
         .select('*')
         .not('latitude', 'is', null)
         .not('longitude', 'is', null)
       
-      if (data) setIssues(data)
+      if (issuesData) setIssues(issuesData)
+
+      // Fetch user's upvotes if logged in
+      if (currentUser) {
+        const { data: upvotes } = await supabase
+          .from('issue_upvotes')
+          .select('issue_id')
+          .eq('user_id', currentUser.id)
+        
+        if (upvotes) {
+          setUpvotedIssueIds(new Set(upvotes.map(u => u.issue_id)))
+        }
+      }
+      
       setLoading(false)
     }
-    fetchIssues()
+    
+    fetchData()
   }, [])
+
+  const toggleUpvote = async (issueId: string) => {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    if (isUpvoting[issueId]) return
+
+    setIsUpvoting(prev => ({ ...prev, [issueId]: true }))
+    const supabase = createClient()
+    const hasUpvoted = upvotedIssueIds.has(issueId)
+
+    try {
+      if (hasUpvoted) {
+        // Remove upvote
+        const { error } = await supabase
+          .from('issue_upvotes')
+          .delete()
+          .match({ issue_id: issueId, user_id: user.id })
+
+        if (!error) {
+          setUpvotedIssueIds(prev => {
+            const next = new Set(prev)
+            next.delete(issueId)
+            return next
+          })
+          setIssues(issues.map(i => i.id === issueId ? { ...i, upvotes: i.upvotes - 1 } : i))
+        }
+      } else {
+        // Add upvote
+        const { error } = await supabase
+          .from('issue_upvotes')
+          .insert({ issue_id: issueId, user_id: user.id })
+
+        if (!error) {
+          setUpvotedIssueIds(prev => {
+            const next = new Set(prev)
+            next.add(issueId)
+            return next
+          })
+          setIssues(issues.map(i => i.id === issueId ? { ...i, upvotes: i.upvotes + 1 } : i))
+        }
+      }
+    } finally {
+      setIsUpvoting(prev => ({ ...prev, [issueId]: false }))
+    }
+  }
 
   const filteredIssues = issues.filter((issue) => {
     if (categoryFilter !== 'All' && issue.category !== categoryFilter) return false
@@ -57,13 +132,12 @@ export default function IssuesMap() {
     return true
   })
 
-  // Calculate center based on all issues
   const center: [number, number] = issues.length > 0
     ? [
         issues.reduce((sum, issue) => sum + (issue.latitude || 0), 0) / issues.length,
         issues.reduce((sum, issue) => sum + (issue.longitude || 0), 0) / issues.length,
       ]
-    : [37.7749, -122.4194] // Default SF if empty
+    : [37.7749, -122.4194]
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -114,38 +188,56 @@ export default function IssuesMap() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {filteredIssues.map(issue => (
-              issue.latitude && issue.longitude && (
-                <Marker key={issue.id} position={[issue.latitude, issue.longitude]}>
-                  <Popup className="civic-popup" minWidth={200}>
-                    <div className="flex flex-col gap-2 min-w-[200px] pb-1">
-                      {issue.photo_url && (
-                        <div className="relative h-28 w-full rounded-md overflow-hidden bg-gray-100">
-                          <Image src={issue.photo_url} alt={issue.title} fill className="object-cover" sizes="200px" />
+            {filteredIssues.map(issue => {
+              const hasUpvoted = upvotedIssueIds.has(issue.id)
+              
+              return (
+                issue.latitude && issue.longitude && (
+                  <Marker key={issue.id} position={[issue.latitude, issue.longitude]}>
+                    <Popup className="civic-popup" minWidth={200}>
+                      <div className="flex flex-col gap-2 min-w-[200px] pb-1">
+                        {issue.photo_url && (
+                          <div className="relative h-28 w-full rounded-md overflow-hidden bg-gray-100">
+                            <Image src={issue.photo_url} alt={issue.title} fill className="object-cover" sizes="200px" />
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-sm leading-tight m-0 mb-1.5">{issue.title}</h3>
+                          <div className="flex gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center rounded-md bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 capitalize">
+                              {issue.category}
+                            </span>
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getStatusColor(issue.status)}`}>
+                              {formatStatus(issue.status)}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-sm leading-tight m-0 mb-1.5">{issue.title}</h3>
-                        <div className="flex gap-1.5 flex-wrap">
-                          <span className="inline-flex items-center rounded-md bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 capitalize">
-                            {issue.category}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getStatusColor(issue.status)}`}>
-                            {formatStatus(issue.status)}
-                          </span>
+                        <div className="flex justify-between items-center text-xs text-gray-500 mt-1 border-t border-gray-100 pt-1.5">
+                          <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleUpvote(issue.id);
+                            }}
+                            disabled={isUpvoting[issue.id]}
+                            className={`flex items-center gap-1 font-medium transition px-2 py-1 rounded-md ${
+                              hasUpvoted 
+                                ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' 
+                                : 'text-gray-500 bg-gray-50 hover:bg-gray-100 hover:text-gray-700'
+                            }`}
+                          >
+                            <svg className={`w-4 h-4 ${hasUpvoted ? 'fill-indigo-600' : 'fill-none stroke-current stroke-2'}`} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.514" />
+                            </svg>
+                            {issue.upvotes}
+                          </button>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center text-xs text-gray-500 mt-1 border-t border-gray-100 pt-1.5">
-                        <span>{new Date(issue.created_at).toLocaleDateString()}</span>
-                        <div className="flex items-center gap-1 text-gray-600 font-medium">
-                          👍 {issue.upvotes}
-                        </div>
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
+                    </Popup>
+                  </Marker>
+                )
               )
-            ))}
+            })}
           </MapContainer>
         )}
       </div>
