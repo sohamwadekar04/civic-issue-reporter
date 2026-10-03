@@ -26,7 +26,18 @@ export default function AdminPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    async function fetchAdminData() {
+    async function fetchAdminData(userId: string) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+      if (!profile || profile.role !== 'admin') {
+        router.replace('/dashboard')
+        return
+      }
+
       const { data: allIssues } = await supabase
         .from('issues')
         .select('*')
@@ -35,6 +46,7 @@ export default function AdminPage() {
       if (allIssues) {
         setIssues(allIssues)
       }
+      setLoading(false)
     }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -43,8 +55,7 @@ export default function AdminPage() {
         return
       }
       setUser(session.user)
-      fetchAdminData()
-      setLoading(false)
+      fetchAdminData(session.user.id)
     })
   }, [router])
 

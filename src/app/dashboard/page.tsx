@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [issues, setIssues] = useState<Issue[]>([])
   const [upvotedIssueIds, setUpvotedIssueIds] = useState<Set<string>>(new Set())
   const [isUpvoting, setIsUpvoting] = useState<Record<string, boolean>>({})
+  const [isAdmin, setIsAdmin] = useState(false)
   
   const [stats, setStats] = useState({
     reported: 0,
@@ -35,6 +36,17 @@ export default function DashboardPage() {
     const supabase = createClient()
 
     async function fetchDashboardData(userId: string) {
+      // Fetch profile role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+        
+      if (profile && profile.role === 'admin') {
+        setIsAdmin(true)
+      }
+
       // Fetch user's issues
       const { data: userIssues } = await supabase
         .from('issues')
@@ -200,12 +212,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
-            >
-              Admin
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
+              >
+                Admin
+              </Link>
+            )}
             <Link
               href="/map"
               className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
