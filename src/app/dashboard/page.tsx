@@ -109,6 +109,34 @@ export default function DashboardPage() {
     router.refresh()
   }
 
+  async function handleDelete(issueId: string, photoUrl: string | null) {
+    if (!window.confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
+      return
+    }
+
+    const supabase = createClient()
+    
+    // Delete photo if exists
+    if (photoUrl) {
+      const urlParts = photoUrl.split('/')
+      const fileName = urlParts[urlParts.length - 1]
+      await supabase.storage.from('issue-photos').remove([fileName])
+    }
+
+    const { error } = await supabase
+      .from('issues')
+      .delete()
+      .eq('id', issueId)
+      .eq('user_id', user?.id)
+
+    if (!error) {
+      setIssues(issues.filter(i => i.id !== issueId))
+      setStats(prev => ({ ...prev, reported: prev.reported - 1 }))
+    } else {
+      alert('Failed to delete issue: ' + error.message)
+    }
+  }
+
   const toggleUpvote = async (issueId: string) => {
     if (!user) return
     if (isUpvoting[issueId]) return
@@ -357,7 +385,21 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       
-                      <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-end text-sm text-gray-500">
+                      <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+                        <div className="flex gap-4 items-center">
+                          <Link
+                            href={`/report?edit=${issue.id}`}
+                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition"
+                          >
+                            Edit
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(issue.id, issue.photo_url)}
+                            className="text-xs font-medium text-red-600 hover:text-red-800 transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
                         <button 
                           onClick={() => toggleUpvote(issue.id)}
                           disabled={isUpvoting[issue.id]}
